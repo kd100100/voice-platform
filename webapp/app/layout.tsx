@@ -5,9 +5,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "OpenAI Realtime + Twilio",
+  title: "Piramal Voice Platform",
   description:
-    "Sample phone call assistant app for OpenAI Realtime API and Twilio",
+    "Voice call assistant platform powered by Piramal",
 };
 
 export default function RootLayout({
