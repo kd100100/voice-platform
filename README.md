@@ -1,4 +1,4 @@
-# Piramal Voice Platform
+# Voice Platform
 
 A voice calling platform that enables AI-powered phone conversations using Twilio.
 

@@ -1,14 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import TopBar from "@/components/top-bar";
 import ChecklistAndConfig from "@/components/checklist-and-config";
 import SessionConfigurationPanel from "@/components/session-configuration-panel";
 import Transcript from "@/components/transcript";
 import FunctionCallsPanel from "@/components/function-calls-panel";
-import { Item } from "@/components/types";
+import type { Item } from "@/components/types";
 import handleRealtimeEvent from "@/lib/handle-realtime-event";
 import PhoneNumberChecklist from "@/components/phone-number-checklist";
+import OutboundCall from "@/components/outbound-call";
 
 const CallInterface = () => {
   const [selectedPhoneNumber, setSelectedPhoneNumber] = useState("");
@@ -78,6 +79,10 @@ const CallInterface = () => {
               selectedPhoneNumber={selectedPhoneNumber}
               allConfigsReady={allConfigsReady}
               setAllConfigsReady={setAllConfigsReady}
+            />
+            <OutboundCall
+              selectedPhoneNumber={selectedPhoneNumber}
+              allConfigsReady={allConfigsReady}
             />
             <Transcript items={items} />
           </div>
