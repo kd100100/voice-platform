@@ -8,15 +8,23 @@ const openai = new OpenAI({
 });
 
 export async function POST(req: Request) {
+  console.log("API: analyze-call endpoint called");
+  
   try {
-    const { items } = await req.json();
+    const body = await req.json();
+    console.log("API: Request body received", typeof body, body ? "has content" : "empty");
+    
+    const { items } = body;
     
     if (!items || !Array.isArray(items)) {
+      console.error("API: Invalid items array", items);
       return NextResponse.json(
         { error: "Invalid request. 'items' array is required." },
         { status: 400 }
       );
     }
+    
+    console.log("API: Items array length", items.length);
 
     // Filter items to only include messages
     const transcriptItems = items.filter(
@@ -66,24 +74,36 @@ export async function POST(req: Request) {
       ${formattedTranscript}
     `;
 
-    // Call OpenAI API
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert call analyzer providing detailed insights on conversation transcripts."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-    });
+    console.log("API: Calling OpenAI API");
+    try {
+      // Call OpenAI API
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert call analyzer providing detailed insights on conversation transcripts."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+      });
 
-    // Return the analysis
-    const analysis = completion.choices[0].message.content || "No analysis available";
-    return NextResponse.json({ analysis });
+      console.log("API: OpenAI API response received");
+      
+      // Return the analysis
+      const analysis = completion.choices[0].message.content || "No analysis available";
+      console.log("API: Analysis length", analysis.length);
+      return NextResponse.json({ analysis });
+    } catch (error: any) {
+      console.error("API: OpenAI API error:", error);
+      return NextResponse.json(
+        { error: `OpenAI API error: ${error.message || 'Unknown error'}` },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Error analyzing call transcript:", error);
     return NextResponse.json(

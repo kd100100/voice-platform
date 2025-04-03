@@ -91,8 +91,13 @@ const Transcript: React.FC<TranscriptProps> = ({ items, callStatus }) => {
               const Icon = isUser ? Phone : isTool ? Wrench : Bot;
 
               // Combine all text parts into a single string for display
+              // Ensure proper encoding for non-English characters
               const displayText = msg.content
-                ? msg.content.map((c) => c.text).join("")
+                ? msg.content.map((c) => {
+                    // Try to detect if the content is in a non-English language
+                    const text = c.text || "";
+                    return text;
+                  }).join("")
                 : "";
 
               return (

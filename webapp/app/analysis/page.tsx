@@ -25,7 +25,9 @@ export default function AnalysisPage() {
       }
 
       try {
+        console.log("Analysis page - itemsParam:", itemsParam.substring(0, 100) + "...");
         const items = JSON.parse(decodeURIComponent(itemsParam));
+        console.log("Analysis page - parsed items:", items.length, "items");
         
         const response = await fetch("/api/analyze-call", {
           method: "POST",
@@ -35,11 +37,16 @@ export default function AnalysisPage() {
           body: JSON.stringify({ items }),
         });
 
+        console.log("Analysis page - API response status:", response.status);
+        
         if (!response.ok) {
-          throw new Error(`API request failed with status ${response.status}`);
+          const errorText = await response.text();
+          console.error("Analysis page - API error:", errorText);
+          throw new Error(`API request failed with status ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
+        console.log("Analysis page - API response data:", data ? "Data received" : "No data");
         setAnalysis(data.analysis);
         
         // Determine recommendation from analysis text
