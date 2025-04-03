@@ -5,7 +5,7 @@ import { Bot, Phone, MessageSquare, Wrench, FileText, BarChart } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { Item } from "@/components/types";
 import { generateAndDownloadTranscriptPdf } from "@/lib/pdf-utils";
-import { generateAndDownloadCallAnalysisPdf } from "@/lib/call-analysis";
+import { useRouter } from "next/navigation";
 
 type TranscriptProps = {
   items: Item[];
@@ -13,6 +13,7 @@ type TranscriptProps = {
 };
 
 const Transcript: React.FC<TranscriptProps> = ({ items, callStatus }) => {
+  const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,7 +52,11 @@ const Transcript: React.FC<TranscriptProps> = ({ items, callStatus }) => {
               size="sm"
               variant="outline"
               className="flex items-center gap-2"
-              onClick={() => generateAndDownloadCallAnalysisPdf(items)}
+              onClick={() => {
+                // Navigate to analysis page with items as URL parameter
+                const itemsParam = encodeURIComponent(JSON.stringify(items));
+                router.push(`/analysis?items=${itemsParam}`);
+              }}
             >
               <BarChart className="h-4 w-4" />
               <span>Analyze Call</span>
