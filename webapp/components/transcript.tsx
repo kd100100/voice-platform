@@ -55,7 +55,8 @@ const Transcript: React.FC<TranscriptProps> = ({ items, callStatus }) => {
               onClick={() => {
                 // Navigate to analysis page with items as URL parameter
                 const itemsParam = encodeURIComponent(JSON.stringify(items));
-                router.push(`/analysis?items=${itemsParam}`);
+                // Open in a new window
+                window.open(`/analysis?items=${itemsParam}`, '_blank');
               }}
             >
               <BarChart className="h-4 w-4" />

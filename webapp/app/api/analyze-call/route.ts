@@ -26,14 +26,28 @@ export async function POST(req: Request) {
     // Format transcript for analysis
     const formattedTranscript = transcriptItems.map((item: Item) => {
       const role = item.role === "user" ? "Caller" : "Assistant";
-      const content = item.content ? item.content.map((c: any) => c.text).join("") : "";
-      return `${role}: ${content}`;
+      const content = item.content ? item.content.map((c: { text: string }) => c.text).join("") : "";
+      
+      // Try to detect if the content is in a non-English language
+      // and add a note about it for the analyzer
+      let languageNote = "";
+      if (content && !/^[A-Za-z0-9\s.,?!;:'"()\-_]*$/.test(content)) {
+        // Contains non-ASCII characters, likely non-English
+        languageNote = " [Note: This message may be in a non-English language]";
+      }
+      
+      return `${role}: ${content}${languageNote}`;
     }).join("\n\n");
+
+    // Check if the transcript contains non-English content
+    const hasNonEnglishContent = formattedTranscript.includes("[Note: This message may be in a non-English language]");
 
     // Prompt for analysis
     const prompt = `
       You are an expert recruitment analyst evaluating an initial screening call for frontline sales staff positions.
       The AI assistant in this conversation was conducting an initial screening interview to check the basic qualifications of the candidate.
+      
+      ${hasNonEnglishContent ? "IMPORTANT: This transcript contains content in a non-English language. Please do your best to analyze it, focusing on any English portions and the overall structure of the conversation." : ""}
       
       Please analyze this interview and provide detailed insights including:
       
