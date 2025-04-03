@@ -97,6 +97,13 @@ function handleTwilioMessage(data: RawData) {
       }
       break;
     case "close":
+      // Notify frontend that call has ended before closing connections
+      if (session.frontendConn && isOpen(session.frontendConn)) {
+        jsonSend(session.frontendConn, {
+          type: "call.ended",
+          timestamp: new Date().toISOString()
+        });
+      }
       closeAllConnections();
       break;
   }

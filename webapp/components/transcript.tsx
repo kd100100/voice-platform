@@ -1,19 +1,28 @@
 import React, { useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bot, Phone, MessageSquare, Wrench } from "lucide-react";
+import { Bot, Phone, MessageSquare, Wrench, FileText, BarChart } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Item } from "@/components/types";
+import { generateAndDownloadTranscriptPdf } from "@/lib/pdf-utils";
+import { generateAndDownloadCallAnalysisPdf } from "@/lib/call-analysis";
 
 type TranscriptProps = {
   items: Item[];
+  callStatus?: string;
 };
 
-const Transcript: React.FC<TranscriptProps> = ({ items }) => {
+const Transcript: React.FC<TranscriptProps> = ({ items, callStatus }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items]);
+
+  // Log callStatus changes
+  useEffect(() => {
+    console.log("Transcript component - callStatus:", callStatus);
+  }, [callStatus]);
 
   // Show messages, function calls, and function call outputs in the transcript
   const transcriptItems = items.filter(
@@ -25,7 +34,31 @@ const Transcript: React.FC<TranscriptProps> = ({ items }) => {
 
   return (
     <Card className="h-full flex flex-col overflow-hidden">
-      <CardContent className="flex-1 h-full min-h-0 overflow-hidden flex flex-col p-0">
+      <CardContent className="flex-1 h-full min-h-0 overflow-hidden flex flex-col p-0 relative">
+        {/* Action buttons - Only show when call is ended and there are transcript items */}
+        {callStatus === "ended" && transcriptItems.length > 0 && (
+          <div className="absolute top-4 right-4 z-10 flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex items-center gap-2"
+              onClick={() => generateAndDownloadTranscriptPdf(items)}
+            >
+              <FileText className="h-4 w-4" />
+              <span>Download Transcript</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex items-center gap-2"
+              onClick={() => generateAndDownloadCallAnalysisPdf(items)}
+            >
+              <BarChart className="h-4 w-4" />
+              <span>Analyze Call</span>
+            </Button>
+          </div>
+        )}
+        
         {transcriptItems.length === 0 && (
           <div className="flex flex-1 h-full items-center justify-center mt-36">
             <div className="flex flex-col items-center gap-3 justify-center h-full">

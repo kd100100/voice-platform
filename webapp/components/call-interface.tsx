@@ -6,6 +6,7 @@ import ChecklistAndConfig from "@/components/checklist-and-config";
 import SessionConfigurationPanel from "@/components/session-configuration-panel";
 import Transcript from "@/components/transcript";
 import FunctionCallsPanel from "@/components/function-calls-panel";
+import { Button } from "@/components/ui/button";
 import type { Item } from "@/components/types";
 import handleRealtimeEvent from "@/lib/handle-realtime-event";
 import PhoneNumberChecklist from "@/components/phone-number-checklist";
@@ -30,7 +31,7 @@ const CallInterface = () => {
       newWs.onmessage = (event) => {
         const data = JSON.parse(event.data);
         console.log("Received logs event:", data);
-        handleRealtimeEvent(data, setItems);
+        handleRealtimeEvent(data, setItems, setCallStatus);
       };
 
       newWs.onclose = () => {
@@ -83,8 +84,9 @@ const CallInterface = () => {
             <OutboundCall
               selectedPhoneNumber={selectedPhoneNumber}
               allConfigsReady={allConfigsReady}
+              onCallStatusChange={setCallStatus}
             />
-            <Transcript items={items} />
+            <Transcript items={items} callStatus={callStatus} />
           </div>
 
           {/* Right Column: Function Calls */}

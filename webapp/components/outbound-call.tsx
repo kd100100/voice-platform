@@ -6,24 +6,28 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Phone, Loader2, RefreshCw } from "lucide-react";
+import { Phone, Loader2, RefreshCw, PhoneOff } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type OutboundCallProps = {
   selectedPhoneNumber: string;
   allConfigsReady: boolean;
+  onCallStatusChange?: (status: string) => void;
 };
 
 const OutboundCall: FC<OutboundCallProps> = ({
   selectedPhoneNumber,
   allConfigsReady,
+  onCallStatusChange,
 }) => {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isFixingWebhook, setIsFixingWebhook] = useState(false);
+  const [isEndingCall, setIsEndingCall] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [webhookStatus, setWebhookStatus] = useState<string | null>(null);
+  const [activeCallSid, setActiveCallSid] = useState<string | null>(null);
 
   const fixWebhook = async () => {
     setIsFixingWebhook(true);
@@ -44,6 +48,47 @@ const OutboundCall: FC<OutboundCallProps> = ({
       setError(err instanceof Error ? err.message : "An unknown error occurred while fixing webhook");
     } finally {
       setIsFixingWebhook(false);
+    }
+  };
+
+  const endCall = async () => {
+    if (!activeCallSid) {
+      setError("No active call to end");
+      return;
+    }
+
+    setIsEndingCall(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/twilio/end-call", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          callSid: activeCallSid,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.details || "Failed to end call");
+      }
+
+      setSuccess("Call ended successfully");
+      setActiveCallSid(null);
+      
+      // Notify parent component that call has ended
+      if (onCallStatusChange) {
+        console.log("Notifying parent that call has ended");
+        onCallStatusChange("ended");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unknown error occurred while ending the call");
+    } finally {
+      setIsEndingCall(false);
     }
   };
 
@@ -80,7 +125,9 @@ const OutboundCall: FC<OutboundCallProps> = ({
         throw new Error(data.error || data.details || "Failed to initiate call");
       }
 
-      setSuccess(`Call initiated successfully! Call SID: ${data.callSid}`);
+      const callSid = data.callSid;
+      setActiveCallSid(callSid);
+      setSuccess(`Call initiated successfully! Call SID: ${callSid}`);
       setPhoneNumber("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
@@ -136,6 +183,30 @@ const OutboundCall: FC<OutboundCallProps> = ({
           <Alert>
             <AlertDescription>{success}</AlertDescription>
           </Alert>
+        )}
+
+        {/* End Call Button - Only show when there's an active call */}
+        {activeCallSid && (
+          <div className="mt-2">
+            <Button
+              variant="destructive"
+              onClick={endCall}
+              disabled={isEndingCall}
+              className="w-full flex items-center justify-center"
+            >
+              {isEndingCall ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Ending Call...
+                </>
+              ) : (
+                <>
+                  <PhoneOff className="mr-2 h-4 w-4" />
+                  End Call
+                </>
+              )}
+            </Button>
+          </div>
         )}
 
         {!allConfigsReady && (

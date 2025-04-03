@@ -1,8 +1,24 @@
 import { Item } from "@/components/types";
 
+// Phrases that indicate the call should end
+const END_CALL_PHRASES = [
+  "goodbye",
+  "thank you for calling",
+  "call has ended",
+  "end of call",
+  "is there anything else i can help you with",
+  "have a great day",
+  "have a nice day",
+  "thank you for your time",
+  "thanks for calling",
+  "call is now complete",
+  "this concludes our call"
+];
+
 export default function handleRealtimeEvent(
   ev: any,
-  setItems: React.Dispatch<React.SetStateAction<Item[]>>
+  setItems: React.Dispatch<React.SetStateAction<Item[]>>,
+  setCallStatus?: React.Dispatch<React.SetStateAction<string>>
 ) {
   // Helper function to create a new item with default fields
   function createNewItem(base: Partial<Item>): Item {
@@ -59,6 +75,26 @@ export default function handleRealtimeEvent(
         // A completed message from user or assistant
         const updatedContent =
           item.content && item.content.length > 0 ? item.content : [];
+        
+        // Check if this is an assistant message that indicates the call should end
+        if (item.role === "assistant" && updatedContent.length > 0) {
+          const messageText = updatedContent.map((c: { type: string; text: string }) => c.text).join("").toLowerCase();
+          
+          // Check if the message contains any end call phrases
+          const shouldEndCall = END_CALL_PHRASES.some(phrase => 
+            messageText.includes(phrase.toLowerCase())
+          );
+          
+          if (shouldEndCall && setCallStatus) {
+            console.log("Detected end of call phrase in assistant message");
+            // Set a timeout to end the call after a short delay
+            setTimeout(() => {
+              console.log("Auto-ending call based on assistant response");
+              setCallStatus("ended");
+            }, 3000); // 3 second delay to allow the message to be heard
+          }
+        }
+        
         setItems((prev) => {
           const idx = prev.findIndex((m) => m.id === item.id);
           if (idx >= 0) {
@@ -221,6 +257,18 @@ export default function handleRealtimeEvent(
             status: "running",
           }),
         ]);
+      }
+      break;
+    }
+
+    case "call.ended": {
+      // Call has ended, update the call status
+      console.log("Call ended event received");
+      if (setCallStatus) {
+        console.log("Setting call status to ended");
+        setCallStatus("ended");
+      } else {
+        console.log("setCallStatus is not defined");
       }
       break;
     }
