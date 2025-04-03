@@ -13,27 +13,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create a response with headers that will make the browser download the file
-    const response = new NextResponse(await generateTranscriptPdf(items), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="call-transcript-${new Date().toISOString().split('T')[0]}.pdf"`,
-      },
+    // Since jsPDF is a client-side library, we'll return a success response
+    // and let the client handle the PDF generation
+    return NextResponse.json({ 
+      success: true, 
+      message: "PDF generation should be handled on the client side",
+      itemCount: items.length
     });
-
-    return response;
   } catch (error) {
-    console.error("Error generating PDF:", error);
+    console.error("Error processing PDF request:", error);
     return NextResponse.json(
-      { error: "Failed to generate PDF" },
+      { error: "Failed to process PDF request" },
       { status: 500 }
     );
   }
-}
-
-async function generateTranscriptPdf(items: Item[]): Promise<ArrayBuffer> {
-  // This function needs to be implemented on the client side
-  // because jspdf is a client-side library
-  // We'll return an empty buffer for now
-  return new ArrayBuffer(0);
 }

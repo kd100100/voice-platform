@@ -15,7 +15,7 @@ const END_CALL_PHRASES = [
   "this concludes our call"
 ];
 
-export default function handleRealtimeEvent(
+export default async function handleRealtimeEvent(
   ev: any,
   setItems: React.Dispatch<React.SetStateAction<Item[]>>,
   setCallStatus?: React.Dispatch<React.SetStateAction<string>>
@@ -154,7 +154,66 @@ export default function handleRealtimeEvent(
 
     case "conversation.item.input_audio_transcription.completed": {
       // Update the user message with the final transcript
-      const { item_id, transcript } = ev;
+      const { item_id, transcript, audio_url } = ev;
+      
+      // Log the transcript for debugging
+      console.log("Received transcript:", transcript);
+      
+      // Check if transcript contains non-English characters
+      const hasNonEnglishChars = transcript.split('').some((char: string) => char.charCodeAt(0) > 127);
+      const hasDevanagariChars = /[\u0900-\u097F]/.test(transcript);
+      
+      if (hasNonEnglishChars || hasDevanagariChars) {
+        console.log("Non-English transcript detected", hasDevanagariChars ? "(Hindi)" : "");
+        
+        // If we have an audio URL and it seems to be Hindi, try to use our custom transcription API
+        if (audio_url) {
+          try {
+            console.log("Attempting to use custom transcription API for Hindi speech");
+            
+            // Fetch the audio file
+            const audioResponse = await fetch(audio_url);
+            const audioBlob = await audioResponse.blob();
+            
+            // Create a FormData object to send to our API
+            const formData = new FormData();
+            formData.append("audio", audioBlob, "speech.webm");
+            
+            // Call our transcription API
+            const response = await fetch("/api/transcribe", {
+              method: "POST",
+              body: formData,
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.transcription) {
+                console.log("Custom transcription successful:", data.transcription);
+                
+                // Update the transcript with the new transcription
+                setItems((prev) =>
+                  prev.map((m) =>
+                    m.id === item_id && m.type === "message" && m.role === "user"
+                      ? {
+                          ...m,
+                          content: [{ type: "text", text: data.transcription }],
+                          status: "completed",
+                        }
+                      : m
+                  )
+                );
+                break;
+              }
+            } else {
+              console.error("Custom transcription failed:", await response.text());
+            }
+          } catch (error) {
+            console.error("Error using custom transcription API:", error);
+          }
+        }
+      }
+      
+      // Fall back to the original transcript if custom transcription failed or wasn't attempted
       setItems((prev) =>
         prev.map((m) =>
           m.id === item_id && m.type === "message" && m.role === "user"
@@ -267,8 +326,25 @@ export default function handleRealtimeEvent(
       if (setCallStatus) {
         console.log("Setting call status to ended");
         setCallStatus("ended");
+        
+        // Log the current items for debugging
+        setItems(prev => {
+          console.log("Items at call end:", prev.length);
+          return prev;
+        });
       } else {
         console.log("setCallStatus is not defined");
+      }
+      break;
+    }
+    
+    // Additional case to handle disconnection events that might not trigger call.ended
+    case "session.disconnected":
+    case "websocket.disconnected": {
+      console.log(`${type} event received, ensuring call status is set to ended`);
+      if (setCallStatus) {
+        console.log("Setting call status to ended due to disconnection");
+        setCallStatus("ended");
       }
       break;
     }

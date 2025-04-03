@@ -25,16 +25,43 @@ export default function AnalysisPage() {
       }
 
       try {
-        console.log("Analysis page - itemsParam:", itemsParam.substring(0, 100) + "...");
-        const items = JSON.parse(decodeURIComponent(itemsParam));
-        console.log("Analysis page - parsed items:", items.length, "items");
+        console.log("Analysis page - itemsParam length:", itemsParam.length);
         
+        // Decode and parse the items
+        let items;
+        try {
+          items = JSON.parse(decodeURIComponent(itemsParam));
+          console.log("Analysis page - parsed items:", items.length, "items");
+          
+          // Log the first few items for debugging
+          if (items.length > 0) {
+            console.log("First item sample:", JSON.stringify(items[0]).substring(0, 200));
+          }
+        } catch (parseError) {
+          console.error("Error parsing items:", parseError);
+          setError("Failed to parse transcript data. The data may be corrupted.");
+          setLoading(false);
+          return;
+        }
+        
+        // Filter to only include message items
+        const messageItems = items.filter(item => item.type === "message");
+        console.log("Filtered to", messageItems.length, "message items");
+        
+        if (messageItems.length === 0) {
+          setError("No message content found in the transcript");
+          setLoading(false);
+          return;
+        }
+        
+        // Make the API request
+        console.log("Making API request to analyze call...");
         const response = await fetch("/api/analyze-call", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ items }),
+          body: JSON.stringify({ items: messageItems }),
         });
 
         console.log("Analysis page - API response status:", response.status);
@@ -46,7 +73,14 @@ export default function AnalysisPage() {
         }
 
         const data = await response.json();
-        console.log("Analysis page - API response data:", data ? "Data received" : "No data");
+        console.log("Analysis page - API response received, analysis length:", data.analysis?.length || 0);
+        
+        if (!data.analysis) {
+          setError("No analysis was returned from the API");
+          setLoading(false);
+          return;
+        }
+        
         setAnalysis(data.analysis);
         
         // Determine recommendation from analysis text
@@ -61,7 +95,7 @@ export default function AnalysisPage() {
         }
       } catch (err) {
         console.error("Error fetching analysis:", err);
-        setError("Failed to analyze transcript. Please try again later.");
+        setError(`Failed to analyze transcript: ${err.message}`);
       } finally {
         setLoading(false);
       }
@@ -101,45 +135,25 @@ export default function AnalysisPage() {
     return formatted;
   };
 
-  // Generate PDF function
-  const generatePDF = async () => {
+  // Generate text function
+  const downloadAnalysisAsText = () => {
     if (!analysis) return;
     
-    const { jsPDF } = await import("jspdf");
-    const doc = new jsPDF();
-    
-    // Add title
-    doc.setFontSize(18);
-    doc.text("Candidate Interview Analysis", 105, 15, { align: "center" });
-    
-    // Add date
-    doc.setFontSize(12);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 105, 25, { align: "center" });
-    
-    // Add content
-    doc.setFontSize(10);
-    let y = 40;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 20;
-    const textWidth = pageWidth - 2 * margin;
-    
-    // Split analysis into lines that fit within the page width
-    const splitText = doc.splitTextToSize(analysis, textWidth);
-    
-    // Add lines to PDF, creating new pages as needed
-    for (let i = 0; i < splitText.length; i++) {
-      if (y > 270) {
-        doc.addPage();
-        y = 20;
-      }
-      
-      doc.text(splitText[i], margin, y);
-      y += 5;
+    try {
+      // Create a blob and download it
+      const blob = new Blob([analysis], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `interview-analysis-${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading analysis:", error);
+      alert("There was an error downloading the analysis. Please try again.");
     }
-    
-    // Save the PDF
-    const filename = `candidate-analysis-${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(filename);
   };
 
   if (loading) {
@@ -181,9 +195,9 @@ export default function AnalysisPage() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Candidate Interview Analysis</h1>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={generatePDF} className="flex items-center gap-2">
+            <Button variant="outline" onClick={downloadAnalysisAsText} className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              <span>Download PDF</span>
+              <span>Download as Text</span>
             </Button>
             <Button asChild variant="outline">
               <Link href="/">Back to Dashboard</Link>

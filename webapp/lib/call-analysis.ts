@@ -1,4 +1,3 @@
-import { jsPDF } from "jspdf";
 import type { Item } from "@/components/types";
 
 /**
@@ -8,13 +7,35 @@ import type { Item } from "@/components/types";
  */
 export async function analyzeCallTranscript(items: Item[]): Promise<string> {
   try {
+    console.log("Analyzing call transcript with", items.length, "items");
+    
+    // Filter to only include message items
+    const messageItems = items.filter(item => item.type === "message");
+    console.log("Filtered to", messageItems.length, "message items");
+    
+    if (messageItems.length === 0) {
+      return "No message content found in the transcript to analyze.";
+    }
+    
+    // Format transcript as text for analysis
+    const transcriptText = messageItems.map(msg => {
+      const role = msg.role === "user" ? "Caller" : msg.role === "tool" ? "Tool" : "Assistant";
+      const content = msg.content ? msg.content.map(c => c.text || "").join("") : "";
+      return `${role}: ${content}`;
+    }).join("\n\n");
+    
+    console.log("Transcript text length:", transcriptText.length);
+    
     // Call the API endpoint
     const response = await fetch('/api/analyze-call', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify({ 
+        items: messageItems,
+        transcriptText: transcriptText 
+      }),
     });
 
     if (!response.ok) {
@@ -22,6 +43,7 @@ export async function analyzeCallTranscript(items: Item[]): Promise<string> {
     }
 
     const data = await response.json();
+    console.log("Analysis received, length:", data.analysis?.length || 0);
     return data.analysis || "No analysis available";
   } catch (error) {
     console.error("Error analyzing call transcript:", error);
@@ -30,9 +52,9 @@ export async function analyzeCallTranscript(items: Item[]): Promise<string> {
 }
 
 /**
- * Generates a PDF with call analysis and downloads it
+ * Generates and downloads call analysis as text
  */
-export async function generateAndDownloadCallAnalysisPdf(items: Item[]): Promise<void> {
+export async function generateAndDownloadCallAnalysisText(items: Item[]): Promise<void> {
   try {
     // Show loading indicator
     const loadingElement = document.createElement("div");
@@ -54,49 +76,28 @@ export async function generateAndDownloadCallAnalysisPdf(items: Item[]): Promise
     `;
     document.body.appendChild(loadingElement);
 
-    // Get analysis
-    const analysis = await analyzeCallTranscript(items);
-
-    // Create PDF
-    const doc = new jsPDF();
-    
-    // Add title
-    doc.setFontSize(18);
-    doc.text("Call Analysis Report", 105, 15, { align: "center" });
-    
-    // Add date
-    doc.setFontSize(12);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 105, 25, { align: "center" });
-    
-    // Add content
-    doc.setFontSize(10);
-    let y = 40;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 20;
-    const textWidth = pageWidth - 2 * margin;
-    
-    // Split analysis into lines that fit within the page width
-    const splitText = doc.splitTextToSize(analysis, textWidth);
-    
-    // Add lines to PDF, creating new pages as needed
-    for (let i = 0; i < splitText.length; i++) {
-      if (y > 270) {
-        doc.addPage();
-        y = 20;
-      }
+    try {
+      // Get analysis
+      const analysis = await analyzeCallTranscript(items);
       
-      doc.text(splitText[i], margin, y);
-      y += 5;
+      // Create a blob and download it
+      const blob = new Blob([analysis], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `call-analysis-${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      console.log("Analysis text downloaded successfully");
+    } finally {
+      // Remove loading indicator
+      document.body.removeChild(loadingElement);
     }
-    
-    // Save the PDF
-    const filename = `call-analysis-${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(filename);
-
-    // Remove loading indicator
-    document.body.removeChild(loadingElement);
   } catch (error) {
-    console.error("Error generating call analysis PDF:", error);
-    alert("Error generating call analysis PDF. Please try again later.");
+    console.error("Error generating call analysis:", error);
+    alert("Error generating call analysis. Please try again later.");
   }
 }

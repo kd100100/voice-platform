@@ -4,7 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Bot, Phone, MessageSquare, Wrench, FileText, BarChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Item } from "@/components/types";
-import { generateAndDownloadTranscriptPdf } from "@/lib/pdf-utils";
+import { generateAndDownloadCallAnalysisText } from "@/lib/call-analysis";
 import { useRouter } from "next/navigation";
 
 type TranscriptProps = {
@@ -20,11 +20,6 @@ const Transcript: React.FC<TranscriptProps> = ({ items, callStatus }) => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items]);
 
-  // Log callStatus changes
-  useEffect(() => {
-    console.log("Transcript component - callStatus:", callStatus);
-  }, [callStatus]);
-
   // Show messages, function calls, and function call outputs in the transcript
   const transcriptItems = items.filter(
     (it) =>
@@ -33,31 +28,59 @@ const Transcript: React.FC<TranscriptProps> = ({ items, callStatus }) => {
       it.type === "function_call_output"
   );
 
+  // Log callStatus changes
+  useEffect(() => {
+    console.log("Transcript component - callStatus:", callStatus);
+  }, [callStatus]);
+
+  // Debug function to check if PDF button should be visible
+  const shouldShowPdfButton = callStatus === "ended" && transcriptItems.length > 0;
+  useEffect(() => {
+    console.log("Should show PDF button:", shouldShowPdfButton, "callStatus:", callStatus, "items:", transcriptItems.length);
+  }, [shouldShowPdfButton, callStatus, transcriptItems.length]);
+
   return (
     <Card className="h-full flex flex-col overflow-hidden">
       <CardContent className="flex-1 h-full min-h-0 overflow-hidden flex flex-col p-0 relative">
-        {/* Action buttons - Only show when call is ended and there are transcript items */}
-        {callStatus === "ended" && transcriptItems.length > 0 && (
+        {/* Action buttons - Show when call is ended or when there are transcript items */}
+        {(callStatus === "ended" || transcriptItems.length > 0) && (
           <div className="absolute top-4 right-4 z-10 flex gap-2">
             <Button
               size="sm"
               variant="outline"
               className="flex items-center gap-2"
-              onClick={() => generateAndDownloadTranscriptPdf(items)}
+              onClick={() => {
+                // Generate and download transcript as text
+                const transcriptText = transcriptItems.map(msg => {
+                  const role = msg.role === "user" ? "Caller" : msg.role === "tool" ? "Tool" : "Assistant";
+                  const content = msg.content ? msg.content.map(c => c.text || "").join("") : "";
+                  return `${role} (${msg.timestamp || ""}): ${content}`;
+                }).join("\n\n");
+                
+                // Create a blob and download it
+                const blob = new Blob([transcriptText], { type: "text/plain" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `call-transcript-${new Date().toISOString().split('T')[0]}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              }}
+              disabled={transcriptItems.length === 0}
+              title={transcriptItems.length === 0 ? "No transcript to download" : "Download transcript as text"}
             >
               <FileText className="h-4 w-4" />
-              <span>Download Transcript</span>
+              <span>Download as Text</span>
             </Button>
             <Button
               size="sm"
               variant="outline"
               className="flex items-center gap-2"
-              onClick={() => {
-                // Navigate to analysis page with items as URL parameter
-                const itemsParam = encodeURIComponent(JSON.stringify(items));
-                // Open in a new window
-                window.open(`/analysis?items=${itemsParam}`, '_blank');
-              }}
+              onClick={() => generateAndDownloadCallAnalysisText(items)}
+              disabled={transcriptItems.length === 0}
+              title={transcriptItems.length === 0 ? "No transcript to analyze" : "Analyze call with GPT-4o and download as text"}
             >
               <BarChart className="h-4 w-4" />
               <span>Analyze Call</span>
@@ -93,12 +116,12 @@ const Transcript: React.FC<TranscriptProps> = ({ items, callStatus }) => {
               // Combine all text parts into a single string for display
               // Ensure proper encoding for non-English characters
               const displayText = msg.content
-                ? msg.content.map((c) => {
-                    // Try to detect if the content is in a non-English language
-                    const text = c.text || "";
-                    return text;
-                  }).join("")
+                ? msg.content.map((c) => c.text || "").join("")
                 : "";
+              
+              // Check if content contains non-English characters
+              const hasNonEnglishChars = displayText.split('').some(char => char.charCodeAt(0) > 127);
+              const hasDevanagariChars = /[\u0900-\u097F]/.test(displayText);
 
               return (
                 <div key={i} className="flex items-start gap-3">
@@ -130,9 +153,22 @@ const Transcript: React.FC<TranscriptProps> = ({ items, callStatus }) => {
                         {msg.timestamp}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed break-words">
-                      {displayText}
-                    </p>
+                    {hasNonEnglishChars ? (
+                      <div>
+                        <p className="text-sm text-muted-foreground leading-relaxed break-words font-medium">
+                          {displayText}
+                        </p>
+                        {hasDevanagariChars && (
+                          <p className="text-xs text-blue-500 mt-1">
+                            Hindi text detected
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground leading-relaxed break-words">
+                        {displayText}
+                      </p>
+                    )}
                   </div>
                 </div>
               );
