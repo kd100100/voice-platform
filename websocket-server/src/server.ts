@@ -33,6 +33,10 @@ app.use(express.urlencoded({ extended: false }));
 const twimlPath = join(__dirname, "twiml.xml");
 const twimlTemplate = readFileSync(twimlPath, "utf-8");
 
+app.get("/", (req, res) => {
+  res.send("WebSocket server is running");
+});
+
 app.get("/public-url", (req, res) => {
   res.json({ publicUrl: PUBLIC_URL });
 });
